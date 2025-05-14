@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     View,
     Text,
@@ -12,16 +12,19 @@ import {
     Platform,
     Dimensions
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import CustomCategoryModal from './CustomCategoryModal';
+import { Router } from 'expo-router';
+
 
 const screenWidth = Dimensions.get("window").width;
 const categoryOptions = [
     { label: 'Food', icon: 'fast-food' },
     { label: 'Utilities', icon: 'flash' },
+    { label: 'Shopping', icon: 'bag' },
     { label: 'School', icon: 'school' },
     { label: 'Internet', icon: 'wifi' },
     { label: 'Health', icon: 'heart' },
@@ -34,7 +37,6 @@ const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
 const YEARS = Array.from({ length: 2030 - 1990 + 1 }, (_, i) => 1990 + i);
 
 const ExpensesScreen = () => {
-    const navigation = useNavigation();
     const [modalVisible, setModalVisible] = useState(false);
     const [selectedCategory, setSelectedCategory] = useState(categoryOptions[0]);
     const [date, setDate] = useState(new Date());
@@ -46,10 +48,46 @@ const ExpensesScreen = () => {
     const [viewMode, setViewMode] = useState('weekly');
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
     const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
-    const [customCategory, setCustomCategory] = useState('');
     const [customCategories, setCustomCategories] = useState([]);
     const [customCategoryModalVisible, setCustomCategoryModalVisible] = useState(false);
-    const [selectedIcon, setSelectedIcon] = useState('help-circle');
+
+    const route = useRoute();
+    const navigation = useNavigation();
+
+    useFocusEffect(
+        useCallback(() => {
+          const scannedExpense = route.params?.scannedExpense;
+          if (scannedExpense) {
+            setTitle(scannedExpense.title || "");
+            setAmount(scannedExpense.amount?.toString() || "");
+            if (scannedExpense.date) {
+                const [month, day, year] = scannedExpense.date.split("/").map(Number);
+                const parsedDate = new Date(year, month - 1, day);
+                if (!isNaN(parsedDate)) {
+                  setDate(parsedDate);
+                } else {
+                  console.warn("Invalid date parsed:", scannedExpense.date);
+                }
+              }
+              
+      
+            // Find and set matched category from your combinedCategories
+            const matchedCategory = combinedCategories.find(
+              (cat) => cat.label.toLowerCase() === scannedExpense.category?.toLowerCase()
+            );
+            if (matchedCategory) {
+              setSelectedCategory(matchedCategory);
+            }
+      
+            setModalVisible(true);
+      
+            // Clear the param so it doesn't keep triggering
+            navigation.setParams({ scannedExpense: null });
+          }
+        }, [route.params?.scannedExpense])
+      );
+      
+
 
     const initialMonthlyData = {};
     MONTHS.forEach(month => {
